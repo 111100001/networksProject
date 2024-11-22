@@ -8,7 +8,7 @@ from scapy.layers.l2 import Ether
 import psutil
 import time
 import concurrent.futures
-
+import signal
 
 tcp_size = 0
 udp_size = 0
@@ -19,6 +19,7 @@ throuput_ehternet = 0
 
 sniff_running = True
 last_calculation_time = time.time()
+latency_data = {}
 
 #task 1 and 2
 #Fadi Azahrani, Ahmed Ammar, Faris Alghamdi, Abdulaziz Alasmari , Abdullah alkhiry 
@@ -28,7 +29,13 @@ def setup_logging():
         level=logging.INFO,
         format='%(message)s'
     )
+    
+def signal_handler(sig, frame):
+    print("\nStopping capture...")
+    sniff_running = False
 
+# register the signal handler
+signal.signal(signal.SIGINT, signal_handler)
 
 def get_network_interface_name(interface_type):
     for interface, addrs in psutil.net_if_addrs().items():
@@ -55,41 +62,60 @@ def get_tcp_flags(tcp_packet):
 def packet_callback(packet):
     timestamp = datetime.now().strftime('%Y-%m-%d %H:%M:%S.%f')
     log_entries = []
+    global latency_data
 
     # Ethernet Layer
     if Ether in packet:
-        log_entries.append(f"[{timestamp}] Ethernet | Dest MAC: {packet[Ether].dst} | Size: {len(packet)} bytes")
+        log_entries.append(f"[{timestamp}] Ethernet | Dest MAC: {packet[Ether].dst} | Source IP: {packet[Ether].src} | Size: {len(packet)} bytes")
     # IP Layer
     if IP in packet:
         proto = packet[IP].proto
         protocol_name = {1: 'ICMP', 6: 'TCP', 17: 'UDP'}.get(proto, str(proto))
-        log_entries.append(f"[{timestamp}] IP | Protocol: {protocol_name} | Dest IP: {packet[IP].dst}")
+        log_entries.append(f"[{timestamp}] IP | Protocol: {protocol_name} | Dest IP: {packet[IP].dst} | Source IP: {packet[IP].src} | Size: {len(packet)} bytes")
+        conn_key = (packet[IP].dst, packet[IP].src)
+        if conn_key not in latency_data: 
+            latency_data[conn_key] = {"start": timestamp}
+            #print(latency_data)
+        else:
+            latency_data[conn_key]["end"] = timestamp
 
     # TCP Layer
     if TCP in packet:
         flags = get_tcp_flags(packet[TCP])
         log_entries.append(
-            f"[{timestamp}] TCP | Dest Port: {packet[TCP].dport} | "
-            f"Size: {len(packet)} bytes | Flags: {flags}"
+            f"[{timestamp}] TCP | Dest Port: {packet[TCP].dport}"
+            f"| Source port: {packet[TCP].sport} Size: {len(packet)} bytes | Flags: {flags}"
         )
+        # conn_key = (packet[TCP].dst, packet[TCP].src)
+        # if conn_key not in latency_data: 
+        #     latency_data[conn_key] = {"start": timestamp}
+        # else:
+        #     latency_data[conn_key]["end"] = timestamp
 
     # UDP Layer
     if UDP in packet:
         log_entries.append(
-            f"[{timestamp}] UDP | Dest Port: {packet[UDP].dport} | "
-            f"Size: {len(packet)} bytes"
+            f"[{timestamp}] UDP | Dest Port: {packet[UDP].dport} "
+            f"| Source port: {packet[UDP].sport} Size: {len(packet)} bytes"
         )
+        # conn_key = (packet[IP].dst, packet[IP].src)
+        # print(conn_key)
+        # if conn_key not in latency_data: 
+        #     latency_data[conn_key] = {"start": timestamp}
+        # else:
+        #     latency_data[conn_key]["end"] = timestamp
 
     # Log all entries
     for entry in log_entries:
         logging.info(entry)
 
 def start_capture(interface=None, filter=""):
+    global sniff_running
     if platform.system() == "Windows":
         if interface is None:
             interface = get_network_interface_name('ethernet')
     else:
-        interface = "enp0s31f6"  # Default for Windows
+        interface = "enp0s31f6"  # Default for Linux
     setup_logging()
     
     with concurrent.futures.ThreadPoolExecutor() as executor:
@@ -102,6 +128,7 @@ def start_capture(interface=None, filter=""):
                   stop_filter=lambda x: not sniff_running)
         except KeyboardInterrupt:
             print("\nStopping capture...")
+            sniff_running = False
         finally:
             sniff_running = False
             throughput_future.result()
@@ -110,9 +137,9 @@ def start_capture(interface=None, filter=""):
 #task 3
 def calculate_throughput():
     global tcp_size, udp_size, ethernet_size, last_calculation_time, sniff_running
-    file_position =0
+    file_position = 0
     while sniff_running:
-        time.sleep(10)  # Wait for 10 seconds
+        time.sleep(3)  # Wait for 10 seconds
         current_time = time.time()
         interval = current_time - last_calculation_time
         with open('network_events.log', 'r') as f:
@@ -120,12 +147,13 @@ def calculate_throughput():
             f.seek(file_position)
             for line in f:
                 if 'TCP' in line and 'Protocol' not in line:
-                    tcp_size += int(line.split('|')[2].split(':')[1].strip(' bytes').strip())
+                    tcp_size += int(line.split('Size:')[1].split('bytes')[0].strip())
                 elif 'UDP' in line and 'Protocol' not in line:
                     num = int(line.split('Size:')[1].split('bytes')[0].strip())
                     udp_size += num
                 elif 'Ethernet' in line and 'Protocol' not in line:
                     ethernet_size += int(line.split('Size:')[1].split('bytes')[0].strip())
+                    #print(ethernet_size)
             file_position = f.tell()
         # Calculate throughputs
         tcp_throughput = (tcp_size * 8) / interval if interval > 0 else 0
@@ -142,35 +170,37 @@ def calculate_throughput():
         udp_size = 0
         ethernet_size = 0
         last_calculation_time = current_time
+
+def calculate_latency_data():
+    total_latency = 0
+    count = 0
+    for conn_key, times in latency_data.item():
+        if "start" in times and "end" in times:
+            total_latency += (times["end"] - times["start"]) * 1000
+            count += 1
+            avg_latency = total_latency / count if count > 0 else 0
+            print(f"\nAverage Latency: {avg_latency:.2f} ms")
+
         
-
-#calculate_sizes('network_events.log')
-
-def calculate_throuput_tcp(protocol_tcp, interval):
-    throuput_tcp = protocol_tcp * 8 / interval
-    return throuput_tcp
-
-def calculate_throuput_udp(protocol_udp, interval):
-    throuput_udp = protocol_udp * 8 / interval
-    return throuput_udp
-
-def calculate_throuput_ethernet(protocol_ethernet, interval):
-    throuput_ethernet = protocol_ethernet * 8 / interval
-    return throuput_ethernet
 
 if __name__ == "__main__":
     try:
         # Start capturing on default interface
         start_capture()
+        calculate_latency_data()
         
     except KeyboardInterrupt:
         print("\nCapture stopped by user")
+        sniff_running = False
         
     except PermissionError:
         print("Error: Run with administrator privileges to capture packets")
 
 
+
+
 #task 4 snippet
+
 # Initialize data structures for tracking throughput and latency
 throughput_data = defaultdict(int)  # Track total bytes per protocol
 latency_data = {}  # Track timestamps for latency calculation
@@ -192,13 +222,13 @@ def update_event_data(protocol, src_addr, dest_addr, message_size, timestamp):
         else:
             latency_data[conn_key]["end"] = timestamp
 
-# Calculate throughput every 10 seconds
-def calculate_throughput(interval=10):
-    print("\n--- Throughput (bps) ---")
-    for protocol, bytes_count in throughput_data.items():
-        throughput_bps = (bytes_count * 8) / interval
-        print(f"{protocol}: {throughput_bps:.2f} bps")
-        throughput_data[protocol] = 0  # Reset counter after each calculation
+# # Calculate throughput every 10 seconds
+# def calculate_throughput(interval=10):
+#     print("\n--- Throughput (bps) ---")
+#     for protocol, bytes_count in throughput_data.items():
+#         throughput_bps = (bytes_count * 8) / interval
+#         print(f"{protocol}: {throughput_bps:.2f} bps")
+#         throughput_data[protocol] = 0  # Reset counter after each calculation
 
 # Calculate average latency
 def calculate_latency():
