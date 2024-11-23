@@ -8,7 +8,7 @@ from datetime import datetime
 import signal
 import sys
 
-# Initialize logging
+# Set up logging configuration
 logging.basicConfig(
     filename='network_events.log',
     level=logging.INFO,
@@ -16,30 +16,37 @@ logging.basicConfig(
 )
 
 class NetworkMonitor:
+
+    #this is a constructor for the class
     def __init__(self):
-        # Data structures for storing metrics
-        self.throughput_data = defaultdict(int)  # Bytes per protocol
+        self.initialize_metrics()
+        self.initialize_throughput_tracking()
+        self.initialize_control_flags()
+        self.start_monitoring_threads()
+
+    def initialize_metrics(self):
+        #these are instance variables of the class   
+        self.throughput_data = defaultdict(int) #this is a custom dictionary that 
+                                                #automatically assignsa default value to any key that does not exist in the dictionary when it is accessed
         self.latency_data = {}  # Connection latency tracking
         self.packet_sizes = defaultdict(list)  # Store packet sizes per protocol
         self.unique_ips = set()
         self.unique_macs = set()
         self.protocol_counts = defaultdict(int)
         self.start_time = time.time()
-        
-        # Improved throughput tracking
+
+    def initialize_throughput_tracking(self):
+        """Initialize throughput tracking data structures"""
         self.throughput_history = {
             'Ethernet': {'times': [], 'values': []},
             'TCP': {'times': [], 'values': []},
             'UDP': {'times': [], 'values': []}
         }
-        
         self.latency_history = []
-        
-        # Control flag
+
+    def initialize_control_flags(self):
+        """Initialize control flags"""
         self.exit_flag = threading.Event()
-        
-        # Start monitoring threads
-        self.start_monitoring_threads()
 
     def packet_callback(self, packet):
         """Process each captured packet"""
