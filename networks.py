@@ -32,6 +32,7 @@ def setup_logging():
     
 def signal_handler(sig, frame):
     print("\nStopping capture...")
+    print(sniff_running)
     sniff_running = False
 
 # register the signal handler
@@ -72,12 +73,6 @@ def packet_callback(packet):
         proto = packet[IP].proto
         protocol_name = {1: 'ICMP', 6: 'TCP', 17: 'UDP'}.get(proto, str(proto))
         log_entries.append(f"[{timestamp}] IP | Protocol: {protocol_name} | Dest IP: {packet[IP].dst} | Source IP: {packet[IP].src} | Size: {len(packet)} bytes")
-        conn_key = (packet[IP].dst, packet[IP].src)
-        if conn_key not in latency_data: 
-            latency_data[conn_key] = {"start": timestamp}
-            #print(latency_data)
-        else:
-            latency_data[conn_key]["end"] = timestamp
 
     # TCP Layer
     if TCP in packet:
@@ -86,11 +81,11 @@ def packet_callback(packet):
             f"[{timestamp}] TCP | Dest Port: {packet[TCP].dport}"
             f"| Source port: {packet[TCP].sport} Size: {len(packet)} bytes | Flags: {flags}"
         )
-        # conn_key = (packet[TCP].dst, packet[TCP].src)
-        # if conn_key not in latency_data: 
-        #     latency_data[conn_key] = {"start": timestamp}
-        # else:
-        #     latency_data[conn_key]["end"] = timestamp
+        conn_key = (packet[TCP].dport, packet[TCP].sport)
+        if conn_key not in latency_data: 
+            latency_data[conn_key] = {"start": time.time()}
+        else:
+            latency_data[conn_key]= {"end": time.time()}
 
     # UDP Layer
     if UDP in packet:
@@ -98,12 +93,11 @@ def packet_callback(packet):
             f"[{timestamp}] UDP | Dest Port: {packet[UDP].dport} "
             f"| Source port: {packet[UDP].sport} Size: {len(packet)} bytes"
         )
-        # conn_key = (packet[IP].dst, packet[IP].src)
-        # print(conn_key)
-        # if conn_key not in latency_data: 
-        #     latency_data[conn_key] = {"start": timestamp}
-        # else:
-        #     latency_data[conn_key]["end"] = timestamp
+        conn_key = (packet[UDP].dport, packet[UDP].sport)
+        if conn_key not in latency_data: 
+            latency_data[conn_key] = {"start": time.time()}
+        else:
+            latency_data[conn_key] = {"end": time.time()}
 
     # Log all entries
     for entry in log_entries:
@@ -174,22 +168,23 @@ def calculate_throughput():
 def calculate_latency_data():
     total_latency = 0
     count = 0
-    for conn_key, times in latency_data.item():
+    for conn_key, times in latency_data.items():
         if "start" in times and "end" in times:
             total_latency += (times["end"] - times["start"]) * 1000
             count += 1
             avg_latency = total_latency / count if count > 0 else 0
             print(f"\nAverage Latency: {avg_latency:.2f} ms")
 
-        
-
 if __name__ == "__main__":
     try:
         # Start capturing on default interface
         start_capture()
         calculate_latency_data()
-        
+
+
+    #this except does not work  
     except KeyboardInterrupt:
+        calculate_latency_data()
         print("\nCapture stopped by user")
         sniff_running = False
         
@@ -229,15 +224,4 @@ def update_event_data(protocol, src_addr, dest_addr, message_size, timestamp):
 #         throughput_bps = (bytes_count * 8) / interval
 #         print(f"{protocol}: {throughput_bps:.2f} bps")
 #         throughput_data[protocol] = 0  # Reset counter after each calculation
-
 # Calculate average latency
-def calculate_latency():
-    total_latency = 0
-    count = 0
-    for conn_key, times in latency_data.items():
-        if "start" in times and "end" in times:
-            latency = (times["end"] - times["start"]) * 1000  # in ms
-            total_latency += latency
-            count += 1
-    avg_latency = total_latency / count if count > 0 else 0
-    print(f"\nAverage Latency: {avg_latency:.2f} ms") 
