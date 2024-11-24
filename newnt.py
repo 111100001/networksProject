@@ -7,8 +7,9 @@ import matplotlib.pyplot as plt
 from datetime import datetime
 import signal
 import sys
+from colorama import Fore, Back, Style
 
-# Set up logging configuration
+                                                # Set up logging configuration
 logging.basicConfig(
     filename='network_events.log',
     level=logging.INFO,
@@ -17,7 +18,7 @@ logging.basicConfig(
 
 class NetworkMonitor:
 
-    #this is a constructor for the class
+                                                #this is a constructor for the class
     def __init__(self):
         self.initialize_metrics()
         self.initialize_throughput_tracking()
@@ -25,34 +26,36 @@ class NetworkMonitor:
         self.start_monitoring_threads()
 
     def initialize_metrics(self):
-        #these are instance variables of the class   
-        self.throughput_data = defaultdict(int) #this is a custom dictionary that 
-                                                #automatically assignsa default value to any key that does not exist in the dictionary when it is accessed
-        self.latency_data = {}  # Connection latency tracking
-        self.packet_sizes = defaultdict(list)  # Store packet sizes per protocol
-        self.unique_ips = set()
-        self.unique_macs = set()
-        self.protocol_counts = defaultdict(int)
-        self.start_time = time.time()
+
+                                                 #these are instance variables of the class   
+        self.throughput_data = defaultdict(int)  # this is a custom dictionary that 
+                                                 # automatically assigns a default value to any key 
+                                                 # that does not exist in the dictionary when it is accessed
+        self.latency_data = {}            # dictionary to store latency data for tcp and udp packets for chart
+        self.packet_sizes = defaultdict(list)   # dictionary to store packet sizes for every packet, sets an empty list as the default value for each key that does not exist
+        self.unique_ips = set()                 #this a set to store unique IP addresses
+        self.unique_macs = set()                #this a set to store unique MAC addresses
+        self.protocol_counts = defaultdict(int) # dictionary to store packet counts per protocol
+        self.start_time = time.time()    # variable to store the start time of the monitoring process
 
     def initialize_throughput_tracking(self):
-        """Initialize throughput tracking data structures"""
+                                                #initialize throughput tracking data structures
+                                                #this is a dictionary to store throughput data for each protocol for chart
         self.throughput_history = {
             'Ethernet': {'times': [], 'values': []},
             'TCP': {'times': [], 'values': []},
             'UDP': {'times': [], 'values': []}
         }
-        self.latency_history = []
+        self.latency_history = []          #list to store latency values for latency distribution chart
 
-    def initialize_control_flags(self):
-        """Initialize control flags"""
+    def initialize_control_flags(self):  #this is a method to help with the control of the monitoring process
         self.exit_flag = threading.Event()
 
-    def packet_callback(self, packet):
+    def packet_callback(self, packet) :  #this is a method to process each packet captured
         """Process each captured packet"""
-        timestamp = time.time()
+        timestamp = time.time()           #get the current time
         
-        # Process Ethernet layer
+                                                 # Process Ethernet layer
         if Ether in packet:
             src_mac = packet[Ether].src
             dst_mac = packet[Ether].dst
@@ -60,42 +63,43 @@ class NetworkMonitor:
             self.unique_macs.add(dst_mac)
             self.update_metrics("Ethernet", len(packet), src_mac, dst_mac, timestamp)
 
-        # Process IP layer
+                                                # Process IP layer
         if IP in packet:
             src_ip = packet[IP].src
             dst_ip = packet[IP].dst
             self.unique_ips.add(src_ip)
             self.unique_ips.add(dst_ip)
             
-            # Process TCP layer
+                                                # Process TCP layer
             if TCP in packet:
                 src_port = packet[TCP].sport
                 dst_port = packet[TCP].dport
                 self.update_metrics("TCP", len(packet), f"{src_ip}:{src_port}", 
                                   f"{dst_ip}:{dst_port}", timestamp)
                 
-            # Process UDP layer
+                                                # Process UDP layer
             elif UDP in packet:
                 src_port = packet[UDP].sport
                 dst_port = packet[UDP].dport
                 self.update_metrics("UDP", len(packet), f"{src_ip}:{src_port}", 
                                   f"{dst_ip}:{dst_port}", timestamp)
-
+                                                #this is a method to update the metrics for each packet captured
     def update_metrics(self, protocol, packet_size, src_addr, dst_addr, timestamp):
         """Update various network metrics"""
-        # Update packet counts and sizes
+                                                # Update packet counts and sizes
         self.protocol_counts[protocol] += 1
         self.packet_sizes[protocol].append(packet_size)
         self.throughput_data[protocol] += packet_size
         
-        # Log the event
+                                                # Log the event using the logging module
         log_message = (f"Protocol: {protocol}, Source: {src_addr}, "
                       f"Destination: {dst_addr}, Size: {packet_size} bytes")
         logging.info(log_message)
         
-        # Track latency for TCP/UDP
-        if protocol in ["TCP", "UDP"]:
+                                                # Track latency for TCP/UDP
+        if protocol in ["TCP", "UDP"]:          #tuple to store the source and destination addresses
             conn_key = (src_addr, dst_addr)
+                                                #if the addresses not in the latency data dictionary, add them
             if conn_key not in self.latency_data:
                 self.latency_data[conn_key] = {"start": timestamp}
             else:
@@ -111,7 +115,7 @@ class NetworkMonitor:
             current_time = time.time()
             interval = 10
             
-            print("\n--- Throughput (bps) ---")
+            print(Fore.RED ,"\n--- Throughput (bps) ---")
             for protocol, bytes_count in self.throughput_data.items():
                 throughput_bps = (bytes_count * 8) / interval
                 
@@ -121,18 +125,20 @@ class NetworkMonitor:
                 )
                 self.throughput_history[protocol]['values'].append(throughput_bps)
                 
-                print(f"{protocol}: {throughput_bps:.2f} bps")
+                print(Fore.BLUE , Back.LIGHTBLUE_EX, f"{protocol}: {throughput_bps:.2f} bps", Back.RESET, Fore.RESET)
                 self.throughput_data[protocol] = 0
 
     def display_statistics(self):
+
         """Display network statistics periodically"""
         while not self.exit_flag.is_set():
-            time.sleep(30)  # Update every 30 seconds
+            time.sleep(2)  # Update every 30 seconds
             self.print_current_stats()
+
 
     def print_current_stats(self):
         """Print current network statistics"""
-        print("\n=== Network Statistics ===")
+        print(Fore.RED ,"\n=== Network Statistics ===\r", Fore.RESET)
         print(f"Unique IP addresses: {len(self.unique_ips)}")
         print(f"Unique MAC addresses: {len(self.unique_macs)}")
         
@@ -200,7 +206,7 @@ class NetworkMonitor:
     def stop_monitoring(self):
         """Stop monitoring and display final statistics"""
         self.exit_flag.set()
-        print("\n=== Final Statistics ===")
+        print(Fore.YELLOW, Back.BLACK , "\n=== Final Statistics ===", Back.RESET, Fore.RESET)
         self.print_current_stats()
         self.generate_visualizations()
 
