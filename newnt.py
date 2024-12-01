@@ -134,37 +134,32 @@ class NetworkMonitor:
 
     def display_statistics(self):       #this is a method to display network statistics
 
-        """Display network statistics periodically"""
         while not self.exit_flag.is_set():
-            time.sleep(2)  # Update every 30 seconds
+            time.sleep(2)               # Update every 30 seconds
             self.print_current_stats()
 
 
-    def print_current_stats(self):
-        """Print current network statistics"""
+    def print_current_stats(self):      #this is a method to print the current network statistics
         print(Fore.RED ,"\n=== Network Statistics ===\r", Fore.RESET)
         print(f"Unique IP addresses: {len(self.unique_ips)}")
         print(f"Unique MAC addresses: {len(self.unique_macs)}")
-        
+                                                #print the statistics for each protocol
         for protocol in self.protocol_counts.keys():
-            avg_size = (sum(self.packet_sizes[protocol]) / 
-                       len(self.packet_sizes[protocol]) 
-                       if self.packet_sizes[protocol] else 0)
+            avg_size = (sum(self.packet_sizes[protocol]) / len(self.packet_sizes[protocol]) if self.packet_sizes[protocol] else 0)
             print(f"\n{protocol} Statistics:")
             print(f"Total packets: {self.protocol_counts[protocol]}")
             print(f"Average packet size: {avg_size:.2f} bytes")
 
-    def generate_visualizations(self):
-        """Generate and save visualization plots"""
+    def generate_visualizations(self):  #method to generate charts an maps
         # Improved throughput over time visualization
         plt.figure(figsize=(12, 6))
         for protocol in ['Ethernet', 'TCP', 'UDP']:
             if self.throughput_history[protocol]['values']:  # Only plot if we have data
                 plt.plot(
-                    self.throughput_history[protocol]['times'],
-                    self.throughput_history[protocol]['values'],
-                    label=f'{protocol} Throughput',
-                    marker='o',
+                    self.throughput_history[protocol]['times'], #x axis
+                    self.throughput_history[protocol]['values'], #y axis
+                    label=f'{protocol} Throughput',     
+                    marker='o',                             #marker style in the chart
                     markersize=2
                 )
         
@@ -202,35 +197,32 @@ class NetworkMonitor:
         plt.savefig('protocol_usage.png', dpi=300, bbox_inches='tight')
         plt.close()
 
-    def start_monitoring_threads(self):
-        """Start monitoring threads"""
+    def start_monitoring_threads(self): #method to create a thread for each monitoring process
         threading.Thread(target=self.calculate_throughput, daemon=True).start()
         threading.Thread(target=self.display_statistics, daemon=True).start()
 
-    def stop_monitoring(self):
-        """Stop monitoring and display final statistics"""
-        self.exit_flag.set()
+    def stop_monitoring(self):          #method to stop the monitoring process
+        self.exit_flag.set()                    #set the exit flag to stop the monitoring threads
         print(Fore.YELLOW, Back.BLACK , "\n=== Final Statistics ===", Back.RESET, Fore.RESET)
         self.print_current_stats()
         self.generate_visualizations()
 
-def signal_handler(sig, frame):
-    """Handle Ctrl+C gracefully"""
+def signal_handler(sig, frame):     #method to handle the signal for stopping the monitoring process
     print("\nStopping network monitoring...")
     monitor.stop_monitoring()
     sys.exit(0)
 
-if __name__ == "__main__":
-    # Set up signal handler for graceful termination
+if __name__ == "__main__":                      #this is the main method that runs the network monitoring process
+                                                # Set up signal handler for graceful termination
     signal.signal(signal.SIGINT, signal_handler)
     
-    # Create and start network monitor
+                                                # Create and start network monitor
     monitor = NetworkMonitor()
     
     print("Starting network monitoring... Press Ctrl+C to stop.")
     
     try:
-        # Start packet capture
+                                                # Start packet capture
         sniff(prn=monitor.packet_callback, store=False)
     except KeyboardInterrupt:
         monitor.stop_monitoring()
