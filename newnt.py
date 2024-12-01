@@ -24,10 +24,10 @@ class NetworkMonitor:
         self.initialize_throughput_tracking()
         self.initialize_control_flags()
         self.start_monitoring_threads()
-
+                                               #these are instance variables of the class
     def initialize_metrics(self):
-
-                                                 #these are instance variables of the class   
+                                                 
+                                                   
         self.throughput_data = defaultdict(int)  # this is a custom dictionary that 
                                                  # automatically assigns a default value to any key 
                                                  # that does not exist in the dictionary when it is accessed
@@ -102,33 +102,37 @@ class NetworkMonitor:
                                                 #if the addresses not in the latency data dictionary, add them
             if conn_key not in self.latency_data:
                 self.latency_data[conn_key] = {"start": timestamp}
-            else:
+            else:                                #if the addresses are in the latency data dictionary, calculate the latency
                 if "start" in self.latency_data[conn_key]:
+                                                #this takes the timestamp of the packet and subtracts the start time of the connection
                     latency = (timestamp - self.latency_data[conn_key]["start"]) * 1000
                     self.latency_history.append(latency)
+                                                #this removes the connection key from the latency data dictionary
                     del self.latency_data[conn_key]
 
-    def calculate_throughput(self):
-        """Calculate and store throughput metrics"""
+    def calculate_throughput(self):     #this is a method to calculate and store throughput metrics
+                                                #a while loop to calculate throughput every 10 seconds
         while not self.exit_flag.is_set():
-            time.sleep(10)  # Calculate every 10 seconds
+            time.sleep(10)              # calculate every 10 seconds
             current_time = time.time()
             interval = 10
-            
-            print(Fore.RED ,"\n--- Throughput (bps) ---")
+                                                #print throughput values for each protocol
+            print(Fore.RED ,"\n--- Throughput (bps) ---") 
             for protocol, bytes_count in self.throughput_data.items():
                 throughput_bps = (bytes_count * 8) / interval
                 
-                # Store timestamp and throughput value
+                                                # store timestamp and throughput value
                 self.throughput_history[protocol]['times'].append(
-                    (current_time - self.start_time) / 60  # Convert to minutes
-                )
+                                                # convert to minutes for better readability
+                    (current_time - self.start_time) / 60  
+                )                                #in the same dict, store the throughput values
                 self.throughput_history[protocol]['values'].append(throughput_bps)
                 
                 print(Fore.BLUE , Back.LIGHTBLUE_EX, f"{protocol}: {throughput_bps:.2f} bps", Back.RESET, Fore.RESET)
+                                                #reset the throughput data for the next interval
                 self.throughput_data[protocol] = 0
 
-    def display_statistics(self):
+    def display_statistics(self):       #this is a method to display network statistics
 
         """Display network statistics periodically"""
         while not self.exit_flag.is_set():
