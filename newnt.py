@@ -28,13 +28,13 @@ class NetworkMonitor:
     def initialize_metrics(self):
                                                  
                                                    
-        self.throughput_data = defaultdict(int)  # this is a custom dictionary that 
-                                                 # automatically assigns a default value to any key 
-                                                 # that does not exist in the dictionary when it is accessed
+        self.throughput_data = defaultdict(int) # this is a custom dictionary that 
+                                                # automatically assigns a default value to any key 
+                                                # that does not exist in the dictionary when it is accessed
         self.latency_data = {}            # dictionary to store latency data for tcp and udp packets for chart
         self.packet_sizes = defaultdict(list)   # dictionary to store packet sizes for every packet, sets an empty list as the default value for each key that does not exist
-        self.unique_ips = set()                 #this a set to store unique IP addresses
-        self.unique_macs = set()                #this a set to store unique MAC addresses
+        self.unique_ips = set()                 # this a set to store unique IP addresses
+        self.unique_macs = set()                # this a set to store unique MAC addresses (only unique)
         self.protocol_counts = defaultdict(int) # dictionary to store packet counts per protocol
         self.start_time = time.time()    # variable to store the start time of the monitoring process
 
@@ -50,9 +50,10 @@ class NetworkMonitor:
 
     def initialize_control_flags(self):  #this is a method to help with the control of the monitoring process
         self.exit_flag = threading.Event()
-
+        
+        
+    #Ahmed Ammar
     def packet_callback(self, packet) :  #this is a method to process each packet captured
-        """Process each captured packet"""
         timestamp = time.time()           #get the current time
         
                                                  # Process Ethernet layer
@@ -84,8 +85,9 @@ class NetworkMonitor:
                 self.update_metrics("UDP", len(packet), f"{src_ip}:{src_port}", 
                                   f"{dst_ip}:{dst_port}", timestamp)
                                                 #this is a method to update the metrics for each packet captured
+                                                
+    #Abdulaziz Alasmari
     def update_metrics(self, protocol, packet_size, src_addr, dst_addr, timestamp):
-        """Update various network metrics"""
                                                 # Update packet counts and sizes
         self.protocol_counts[protocol] += 1
         self.packet_sizes[protocol].append(packet_size)
@@ -135,7 +137,7 @@ class NetworkMonitor:
     def display_statistics(self):       #this is a method to display network statistics
 
         while not self.exit_flag.is_set():
-            time.sleep(2)               # Update every 30 seconds
+            time.sleep(30)               # Update every 30 seconds
             self.print_current_stats()
 
 
@@ -145,13 +147,15 @@ class NetworkMonitor:
         print(f"Unique MAC addresses: {len(self.unique_macs)}")
                                                 #print the statistics for each protocol
         for protocol in self.protocol_counts.keys():
-            avg_size = (sum(self.packet_sizes[protocol]) / len(self.packet_sizes[protocol]) if self.packet_sizes[protocol] else 0)
+            avg_size = (sum(self.packet_sizes[protocol]) / len(self.packet_sizes[protocol]) 
+                        if self.packet_sizes[protocol] else 0)
             print(f"\n{protocol} Statistics:")
             print(f"Total packets: {self.protocol_counts[protocol]}")
             print(f"Average packet size: {avg_size:.2f} bytes")
-
+            
+    #Abudallah AlKhairy
     def generate_visualizations(self):  #method to generate charts an maps
-        # Improved throughput over time visualization
+                                                # Improved throughput over time visualization
         plt.figure(figsize=(12, 6))
         for protocol in ['Ethernet', 'TCP', 'UDP']:
             if self.throughput_history[protocol]['values']:  # Only plot if we have data
@@ -172,7 +176,7 @@ class NetworkMonitor:
         plt.savefig('throughput_over_time.png', dpi=300, bbox_inches='tight')
         plt.close()
 
-        # Latency distribution
+                                                            # Latency distribution
         if self.latency_history:
             plt.figure(figsize=(12, 6))
             plt.hist(self.latency_history, bins=50, edgecolor='black')
@@ -184,7 +188,7 @@ class NetworkMonitor:
             plt.savefig('latency_distribution.png', dpi=300, bbox_inches='tight')
             plt.close()
 
-        # Protocol usage
+                                                            # Protocol usage
         plt.figure(figsize=(12, 6))
         protocols = list(self.protocol_counts.keys())
         counts = list(self.protocol_counts.values())
@@ -196,33 +200,34 @@ class NetworkMonitor:
         plt.tight_layout()
         plt.savefig('protocol_usage.png', dpi=300, bbox_inches='tight')
         plt.close()
-
-    def start_monitoring_threads(self): #method to create a thread for each monitoring process
+        
+    #Faris Alghamdi
+    def start_monitoring_threads(self):             #method to create a thread for each monitoring process
         threading.Thread(target=self.calculate_throughput, daemon=True).start()
         threading.Thread(target=self.display_statistics, daemon=True).start()
 
-    def stop_monitoring(self):          #method to stop the monitoring process
-        self.exit_flag.set()                    #set the exit flag to stop the monitoring threads
+    def stop_monitoring(self):                      #method to stop the monitoring process
+        self.exit_flag.set()                                #set the exit flag to stop the monitoring threads
         print(Fore.YELLOW, Back.BLACK , "\n=== Final Statistics ===", Back.RESET, Fore.RESET)
         self.print_current_stats()
         self.generate_visualizations()
 
-def signal_handler(sig, frame):     #method to handle the signal for stopping the monitoring process
+def signal_handler(sig, frame):                 #method to handle the signal for stopping the monitoring process
     print("\nStopping network monitoring...")
     monitor.stop_monitoring()
     sys.exit(0)
 
-if __name__ == "__main__":                      #this is the main method that runs the network monitoring process
-                                                # Set up signal handler for graceful termination
+if __name__ == "__main__":                                   #this is the main method that runs the network monitoring process
+                                                             # Set up signal handler for graceful termination
     signal.signal(signal.SIGINT, signal_handler)
     
-                                                # Create and start network monitor
+                                                             # Create and start network monitor
     monitor = NetworkMonitor()
     
     print("Starting network monitoring... Press Ctrl+C to stop.")
     
     try:
-                                                # Start packet capture
+                                                             # Start packet capture
         sniff(prn=monitor.packet_callback, store=False)
     except KeyboardInterrupt:
         monitor.stop_monitoring()
