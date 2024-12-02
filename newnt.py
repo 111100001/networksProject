@@ -15,7 +15,7 @@ logging.basicConfig(
     level=logging.INFO,
     format='%(asctime)s - %(message)s'
 )
-
+#Fadi Alzahrani
 class NetworkMonitor:
 
                                                 #this is a constructor for the class
@@ -125,8 +125,8 @@ class NetworkMonitor:
                 
                                                 # store timestamp and throughput value
                 self.throughput_history[protocol]['times'].append(
-                                                # convert to minutes for better readability
-                    (current_time - self.start_time) / 60  
+                                                
+                    (current_time - self.start_time)   
                 )                                #in the same dict, store the throughput values
                 self.throughput_history[protocol]['values'].append(throughput_bps)
                 
@@ -168,7 +168,7 @@ class NetworkMonitor:
                 )
         
         plt.title('Network Throughput Over Time')
-        plt.xlabel('Time (minutes)')
+        plt.xlabel('Time (seconds)')
         plt.ylabel('Throughput (bits per second)')
         plt.grid(True, linestyle='--', alpha=0.7)
         plt.legend()
